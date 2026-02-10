@@ -1,0 +1,5 @@
+{
+    "api_key": "DEMO_KEY",
+    "storage_dir": "apod_images/",
+    "background_path": "/tmp/background.jpg"
+}
