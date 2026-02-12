@@ -1,5 +1,6 @@
 {
     "api_key": "DEMO_KEY",
-    "storage_dir": "apod_images/",
+    "storage_dir": "/tmp/apod_images/",
+    "favorite_dir": "/tmp/favorite/",
     "background_path": "/tmp/background.jpg"
 }
