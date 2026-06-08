@@ -52,7 +52,7 @@ impl Response {
 
         if response.status() != 200 {
             bail!(
-                "Unable to get todays information,g ot status {}",
+                "Unable to get todays information, got status {}",
                 response.status()
             );
         }
