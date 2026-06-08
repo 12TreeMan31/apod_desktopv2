@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
-
 use anyhow::{Result, bail};
+use apod_desktopv2::config::Config;
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
@@ -14,22 +14,6 @@ use ureq::Agent;
 struct OptArgs {
     config_file: Option<PathBuf>,
     save_mode: bool,
-}
-
-#[derive(Deserialize, Debug)]
-struct Config {
-    api_key: String,
-    storage_dir: PathBuf,
-    favorite_dir: PathBuf,
-    background_path: PathBuf,
-}
-
-impl Config {
-    fn load(path: &Path) -> Result<Self> {
-        let file = File::open(path)?;
-        let cfg: Self = serde_json::from_reader(file)?;
-        Ok(cfg)
-    }
 }
 
 #[allow(dead_code)]
