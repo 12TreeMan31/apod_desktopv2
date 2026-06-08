@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 use anyhow::{Result, bail};
-use apod_desktopv2::config::Config;
+use apod_desktopv2::config::{Config, OptArgs};
 use little_exif::exif_tag::ExifTag;
 use little_exif::filetype::FileExtension;
 use little_exif::metadata::Metadata;
@@ -10,11 +10,6 @@ use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use ureq::Agent;
-
-struct OptArgs {
-    config_file: Option<PathBuf>,
-    save_mode: bool,
-}
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -110,16 +105,11 @@ fn save_mode(favorite_dir: &Path, storage_dir: &Path) -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let mut pargs = pico_args::Arguments::from_env();
-    let args = OptArgs {
-        config_file: pargs.opt_value_from_str(["-c", "--config"]).unwrap_or(None),
-        save_mode: pargs.contains(["-s", "--save"]),
-    };
-
+    let args = OptArgs::parse();
     let xdg_dir = xdg::BaseDirectories::with_prefix("apod_desktop");
 
     // Firsts see if a path was provided then checks XDG for a path if none was found
-    let config_path = args.config_file.unwrap_or_else(|| {
+    let config_path = args.config.unwrap_or_else(|| {
         xdg_dir
             .get_config_file("config")
             .expect("XDG is not configured")
@@ -129,7 +119,7 @@ fn main() -> Result<()> {
         bail!("Unable to read config! Please make sure it exsit and is in valid json.");
     };
 
-    if args.save_mode {
+    if args.save {
         return save_mode(&config.favorite_dir, &config.storage_dir);
     }
 
@@ -157,7 +147,6 @@ fn main() -> Result<()> {
     let mut image = File::create(config.storage_dir.clone())?;
     image.write_all(&image_data)?;
     fs::copy(config.storage_dir, config.background_path)?;
-    println!("Saved!");
 
     Ok(())
 }

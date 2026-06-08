@@ -1,13 +1,19 @@
+/// Contains everything needed for configuration
 use anyhow::Result;
 use serde::Deserialize;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 
+/// Json config format
 #[derive(Deserialize, Debug)]
 struct JsonConfig {
+    /// Path of where images will be stored.
     storage_dir: PathBuf,
+    /// File where the API key is located.
     api_key_path: PathBuf,
+    /// Path of where to keep favorited images; defaults to `storage_dir/liked/`.
     favorite_dir: Option<PathBuf>,
+    /// To be removed
     background_path: Option<PathBuf>,
 }
 
@@ -44,5 +50,25 @@ impl Config {
         };
 
         Ok(cfg)
+    }
+}
+
+pub struct OptArgs {
+    /// Specify a config file. Default: `$XDG_CONFIG_HOME/apod_desktop/config`
+    pub config: Option<PathBuf>,
+    /// Favorite NEWEST image in `storage_dir`
+    pub save: bool,
+    /// Show help message and quit.
+    help: bool,
+}
+
+impl OptArgs {
+    pub fn parse() -> Self {
+        let mut pargs = pico_args::Arguments::from_env();
+        OptArgs {
+            config: pargs.opt_value_from_str(["-c", "--config"]).unwrap_or(None),
+            save: pargs.contains(["-s", "--save"]),
+            help: pargs.contains(["-h", "--help"]),
+        }
     }
 }
