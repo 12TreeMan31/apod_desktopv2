@@ -1,4 +1,4 @@
-# apod_desktopv2
+# Astronomy Desktop Image Background (adi-bg)
 
 A basic program that fetches the current image from https://apod.nasa.gov.
 

@@ -4,7 +4,7 @@ After=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/apod_desktopv2
+ExecStart=/usr/bin/adi-bg
 
 [Install]
 WantedBy=default.target

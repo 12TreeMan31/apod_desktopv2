@@ -106,7 +106,7 @@ fn save_mode(favorite_dir: &Path, storage_dir: &Path) -> Result<()> {
 
 fn main() -> Result<()> {
     let args = OptArgs::parse();
-    let xdg_dir = xdg::BaseDirectories::with_prefix("apod_desktop");
+    let xdg_dir = xdg::BaseDirectories::with_prefix("adi-bg");
 
     // Firsts see if a path was provided then checks XDG for a path if none was found
     let config_path = args.config.unwrap_or_else(|| {
@@ -146,7 +146,7 @@ fn main() -> Result<()> {
 
     let mut image = File::create(config.storage_dir.clone())?;
     image.write_all(&image_data)?;
-    fs::copy(config.storage_dir, config.background_path)?;
+    std::os::unix::fs::symlink(config.storage_dir, config.background_path)?;
 
     Ok(())
 }

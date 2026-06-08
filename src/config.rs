@@ -58,8 +58,6 @@ pub struct OptArgs {
     pub config: Option<PathBuf>,
     /// Favorite NEWEST image in `storage_dir`
     pub save: bool,
-    /// Show help message and quit.
-    help: bool,
 }
 
 impl OptArgs {
@@ -68,7 +66,6 @@ impl OptArgs {
         OptArgs {
             config: pargs.opt_value_from_str(["-c", "--config"]).unwrap_or(None),
             save: pargs.contains(["-s", "--save"]),
-            help: pargs.contains(["-h", "--help"]),
         }
     }
 }
