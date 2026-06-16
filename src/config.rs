@@ -10,15 +10,15 @@ struct JsonConfig {
     storage_dir: PathBuf,
     /// File where the API key is located.
     api_key_path: PathBuf,
-    /// To be removed
-    background_path: Option<PathBuf>,
+    /// Directory for logs and other misc things
+    state_dir: Option<PathBuf>,
 }
 
 #[derive(Debug)]
 pub struct Config {
     pub storage_dir: PathBuf,
     pub api_key: String,
-    pub background_path: PathBuf,
+    pub state_dir: Option<PathBuf>,
 }
 
 impl Config {
@@ -26,17 +26,12 @@ impl Config {
         let file = File::open(path)?;
         let json: JsonConfig = serde_json::from_reader(file)?;
 
-        let background = match json.background_path {
-            Some(x) => x,
-            None => json.storage_dir.clone(),
-        };
-
         let api_key = fs::read_to_string(json.api_key_path)?;
 
         let cfg = Config {
             storage_dir: json.storage_dir,
             api_key,
-            background_path: background,
+            state_dir: json.state_dir,
         };
 
         Ok(cfg)

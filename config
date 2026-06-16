@@ -1,5 +1,5 @@
 {    
     "storage_dir": "/tmp/apod_images/",
-    "api_key_path": "./DEMO_KEY"
-    "background_path": "/tmp/background.jpg"
+    "api_key_path": "DEMO_KEY",
+    "state_dir": "/tmp/apod_state/"
 }

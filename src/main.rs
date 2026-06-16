@@ -1,107 +1,70 @@
 // SPDX-License-Identifier: GPL-2.0
+use adi_bg::config::{Config, OptArgs};
+use adi_bg::response::Response;
 use anyhow::{Result, bail};
-use apod_desktopv2::config::{Config, OptArgs};
-use little_exif::exif_tag::ExifTag;
-use little_exif::filetype::FileExtension;
-use little_exif::metadata::Metadata;
-use serde::Deserialize;
 use std::fs::{self, File};
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
+use std::str;
 use std::time::Duration;
 use ureq::Agent;
 
-#[allow(dead_code)]
-#[derive(Deserialize, Debug)]
-struct Response {
-    copyright: Option<String>,
-    date: String,
-    explanation: String,
-    hdurl: String,
-    media_type: String,
-    title: String,
-}
+/// We need to do 3 things.
+/// 1. Download todays image, and let that image get set as the background.
+/// 2. Get the path of the currently selected image.
+/// 3. Method to randomize a set of images.
 
-impl Response {
-    fn make_request(agent: &Agent, api_key: &str) -> Result<Self> {
-        let mut response = agent
-            .get("https://api.nasa.gov/planetary/apod")
-            .query("api_key", api_key)
-            .call()?;
+fn fetch_image(config: &Config) -> Option<PathBuf> {
+    let agent_cfg = Agent::config_builder()
+        .timeout_global(Some(Duration::from_secs(5)))
+        .build();
+    let agent: Agent = agent_cfg.new_agent();
 
-        if response.status() != 200 {
-            bail!(
-                "Unable to get todays information, got status {}",
-                response.status()
-            );
-        }
+    let Ok(res) = Response::make_request(&agent, &config.api_key) else {
+        println!("Couldn't make request");
+        return None;
+    };
 
-        let json: Response = response.body_mut().read_json()?;
-        Ok(json)
+    if res.media_type != "image" {
+        println!("Is not an image");
+        return None;
     }
 
-    /// Gets todays image located in `hdurl`. It will then populate the EXIF Tags with the
-    /// image information.
-    ///
-    /// `Response::make_request` should have been called before this.
-    fn get_image_data(&self, agent: &Agent) -> Result<Vec<u8>> {
-        let mut image_data = agent.get(&self.hdurl).call()?;
+    // Todays image name
+    let img_name = res.image_name();
 
-        if image_data.status() != 200 {
-            bail!(
-                "Unable to get image data, got status {}",
-                image_data.status()
-            )
-        }
+    // Checks to see if image is already downloaded
+    let is_new = fs::read_dir(&config.storage_dir)
+        .expect("Isn't new")
+        .filter_map(|x| x.ok())
+        .all(|s| s.file_name() != img_name);
 
-        let mut image_data = image_data.body_mut().read_to_vec()?;
-        let mut metadata = Metadata::new();
-        metadata.set_tag(ExifTag::ImageDescription(self.explanation.clone()));
-        metadata.set_tag(ExifTag::CreateDate(self.date.clone()));
-
-        if let Some(copyright) = self.copyright.as_ref() {
-            metadata.set_tag(ExifTag::Copyright(copyright.clone()));
-        }
-
-        metadata
-            .write_to_vec(&mut image_data, FileExtension::JPEG)
-            .expect("Wont fail");
-
-        Ok(image_data)
+    if !is_new {
+        return None;
     }
+
+    // Save image
+    let mut img_bytes = res.get_image_bytes(&agent).unwrap();
+    res.set_image_metadata(&mut img_bytes);
+
+    let mut path = config.storage_dir.clone();
+    path.push(img_name);
+
+    let mut image = File::create(&path).ok()?;
+    image.write_all(&img_bytes);
+
+    Some(path)
 }
 
-fn get_file_extension(url: &str) -> &str {
-    let (_, extension) = url
-        .rsplit_once(".")
-        .expect("somehow got a url without a file extension");
-
-    extension
+fn get_bg_name(cache_file: &Path) -> Option<PathBuf> {
+    let data = fs::read(cache_file).ok()?;
+    let bg_name = str::from_utf8(&data).expect("Invalid utf8");
+    Some(PathBuf::from(bg_name))
 }
 
-/// Creates a simlink in `favorite_dir` by NEWEST image in `storage_dir` NOT by the current date.
-/// The reason for this is that APOD doesn't get updated at midnight in whatever timezone you're in.
-fn save_mode(favorite_dir: &Path, storage_dir: &Path) -> Result<()> {
-    // All images should be in the format of YYYY-MM-DD and it is assumed ASCII compatible
-    let newest_image = fs::read_dir(storage_dir)
-        .expect("Failed to read dir")
-        .map(|val| val.unwrap().file_name())
-        .reduce(|acc, cur| {
-            let order = acc.as_encoded_bytes().cmp(cur.as_encoded_bytes());
-
-            if order.is_ge() { acc } else { cur }
-        })
-        .unwrap();
-
-    let mut original = PathBuf::from(storage_dir);
-    original.push(newest_image.clone());
-
-    let mut link = PathBuf::from(favorite_dir);
-    link.push(newest_image);
-
-    std::os::unix::fs::symlink(original, link)?;
-
-    Ok(())
+fn set_bg_name(cache_file: &Path, bg_name: &Path) {
+    let bg_name = bg_name.to_str().unwrap();
+    fs::write(cache_file, bg_name).unwrap();
 }
 
 fn main() -> Result<()> {
@@ -115,38 +78,31 @@ fn main() -> Result<()> {
             .expect("XDG is not configured")
     });
 
-    let Ok(mut config) = Config::load(&config_path) else {
+    let Ok(config) = Config::load(&config_path) else {
         bail!("Unable to read config! Please make sure it exsit and is in valid json.");
     };
 
-    if args.save {
-        return save_mode(&config.favorite_dir, &config.storage_dir);
-    }
+    let mut cache_file = config
+        .state_dir
+        .clone()
+        .unwrap_or_else(|| xdg_dir.state_home.expect("XDG is not configured"));
+    cache_file.push("bg");
 
-    let agent_cfg = Agent::config_builder()
-        .timeout_global(Some(Duration::from_secs(5)))
-        .build();
-    let agent: Agent = agent_cfg.into();
+    let background_path: PathBuf = if args.path {
+        if let Some(x) = get_bg_name(&cache_file) {
+            x
+        } else {
+            unimplemented!()
+        }
+    } else if args.random {
+        unimplemented!()
+    } else {
+        let path = fetch_image(&config).unwrap();
+        set_bg_name(&cache_file, &path);
 
-    println!("Read config");
-    let Ok(response) = Response::make_request(&agent, &config.api_key) else {
-        bail!("Unable to get get todays image! Is the api key valid?");
+        path
     };
 
-    if response.media_type != "image" {
-        bail!("Wrong media type");
-    }
-
-    let image_data = response.get_image_data(&agent)?;
-    let ex = get_file_extension(&response.hdurl);
-
-    let image_name = format!("{}.{}", response.date, ex);
-
-    config.storage_dir.push(image_name);
-
-    let mut image = File::create(config.storage_dir.clone())?;
-    image.write_all(&image_data)?;
-    std::os::unix::fs::symlink(config.storage_dir, config.background_path)?;
-
+    print!("{}", background_path.to_str().unwrap());
     Ok(())
 }
