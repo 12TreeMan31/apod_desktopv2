@@ -1,7 +1,6 @@
 /// Contains everything needed for configuration
-use std::fs::{self, File};
-use std::io;
 use std::path::{Path, PathBuf};
+use std::{fs, io};
 use xdg::BaseDirectories;
 
 #[derive(Debug)]
@@ -28,7 +27,7 @@ impl RawConfig {
 
         let pairs = cfg_string
             .lines()
-            .filter_map(|x| x.trim().split_once(" "))
+            .filter_map(|x| x.trim().split_once(":"))
             .map(|(s, x)| (s.trim(), x.trim()));
 
         for (key, val) in pairs {

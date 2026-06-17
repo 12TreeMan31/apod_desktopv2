@@ -1,5 +1,3 @@
-{    
-    "storage_dir": "/tmp/apod_images/",
-    "api_key_path": "DEMO_KEY",
-    "state_dir": "/tmp/apod_state/"
-}
+storage_dir:    /tmp/apod_images/
+state_dir:      /tmp/apod_state/
+api_key_path:   KEY
