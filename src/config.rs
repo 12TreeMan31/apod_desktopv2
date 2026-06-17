@@ -1,19 +1,54 @@
 /// Contains everything needed for configuration
-use serde::Deserialize;
 use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
 use xdg::BaseDirectories;
 
-/// Json config format
-#[derive(Deserialize, Debug)]
-struct JsonConfig {
-    /// Path of where images will be stored.
-    storage_dir: PathBuf,
-    /// File where the API key is located.
-    api_key_path: PathBuf,
+#[derive(Debug)]
+struct RawConfig {
+    /// Path to where images will be stored
+    storage_dir: Option<PathBuf>,
+    /// File to where the API key is located
+    api_key_path: Option<PathBuf>,
     /// Directory for logs and other misc things
     state_dir: Option<PathBuf>,
+}
+
+impl RawConfig {
+    fn new() -> Self {
+        RawConfig {
+            storage_dir: None,
+            api_key_path: None,
+            state_dir: None,
+        }
+    }
+
+    fn parse(cfg_string: String) -> Self {
+        let mut cfg = RawConfig::new();
+
+        let pairs = cfg_string
+            .lines()
+            .filter_map(|x| x.trim().split_once(" "))
+            .map(|(s, x)| (s.trim(), x.trim()));
+
+        for (key, val) in pairs {
+            match key {
+                "storage_dir" => cfg.storage_dir = Some(val.into()),
+                "api_key_path" => cfg.api_key_path = Some(val.into()),
+                "state_dir" => cfg.state_dir = Some(val.into()),
+                _ => (),
+            }
+        }
+
+        cfg
+    }
+    fn verify(self) -> Option<Self> {
+        if self.api_key_path == None || self.storage_dir == None {
+            return None;
+        }
+
+        Some(self)
+    }
 }
 
 #[derive(Debug)]
@@ -25,26 +60,35 @@ pub struct Config {
 
 impl Config {
     pub fn load(path: &Path, xdg_dir: BaseDirectories) -> io::Result<Self> {
-        let file = File::open(path)?;
-        let json: JsonConfig = serde_json::from_reader(file)?;
+        let raw = fs::read_to_string(path)?;
+        let Some(rcfg) = RawConfig::parse(raw).verify() else {
+            unimplemented!()
+        };
 
-        let api_key = fs::read_to_string(json.api_key_path)?.trim().to_string();
+        let Some(api_key_path) = rcfg.api_key_path else {
+            unreachable!()
+        };
+        let Some(storage_dir) = rcfg.storage_dir else {
+            unreachable!()
+        };
 
-        let state_dir = json.state_dir.unwrap_or_else(|| {
+        let api_key = fs::read_to_string(&api_key_path)?.trim().to_string();
+
+        let state_dir = rcfg.state_dir.unwrap_or_else(|| {
             xdg_dir
                 .state_home
                 .unwrap_or_else(|| PathBuf::from("/tmp/apod"))
         });
 
-        if !json.storage_dir.exists() {
-            fs::create_dir_all(&json.storage_dir)?;
+        if !storage_dir.exists() {
+            fs::create_dir_all(&storage_dir)?;
         }
         if !state_dir.exists() {
             fs::create_dir_all(&state_dir)?;
         }
 
         let cfg = Config {
-            storage_dir: json.storage_dir,
+            storage_dir,
             api_key,
             state_dir,
         };
