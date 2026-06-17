@@ -1,8 +1,6 @@
 PREFIX = /usr
 
 run:
-	mkdir -p /tmp/apod_images/
-	mkdir -p /tmp/apod_state/
 	cargo run -- -c config
 
 install: 
