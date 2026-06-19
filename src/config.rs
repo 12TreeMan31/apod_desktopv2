@@ -80,7 +80,13 @@ impl Config {
             unreachable!()
         };
 
-        let api_key = fs::read_to_string(&api_key_path)?.trim().to_string();
+        let api_key = match fs::read_to_string(&api_key_path) {
+            Ok(x) => x.trim().to_string(),
+            Err(e) => {
+                error!("Unable to get api key: {}", e);
+                return Err(e);
+            }
+        };
 
         let state_dir = rcfg.state_dir.unwrap_or_else(|| {
             xdg_dir
