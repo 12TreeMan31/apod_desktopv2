@@ -9,5 +9,6 @@ little_exif = "=0.6.23"
 log = "0.4.32"
 pico-args = "0.5.0"
 serde = {version = "1", features = ["derive"] }
+simple_logger = "5.2.0"
 ureq = {version = "3.1.4", features = ["json"] } 
 xdg = "3.0.0"

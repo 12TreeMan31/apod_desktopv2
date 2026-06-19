@@ -1,3 +1,4 @@
+use log::{error, info, warn};
 /// Contains everything needed for configuration
 use std::path::{Path, PathBuf};
 use std::{fs, io};
@@ -35,18 +36,21 @@ impl RawConfig {
                 "storage_dir" => cfg.storage_dir = Some(val.into()),
                 "api_key_path" => cfg.api_key_path = Some(val.into()),
                 "state_dir" => cfg.state_dir = Some(val.into()),
-                _ => (),
+                _ => warn!("Unrecognized value: {}", key),
             }
         }
 
         cfg
     }
-    fn verify(self) -> Option<Self> {
-        if self.api_key_path == None || self.storage_dir == None {
-            return None;
+    fn verify(self) -> Result<Self, String> {
+        if self.api_key_path.is_none() {
+            return Err("Config is missing api_key_path".to_string());
+        }
+        if self.storage_dir.is_none() {
+            return Err("Config is missing storage_dir".to_string());
         }
 
-        Some(self)
+        Ok(self)
     }
 }
 
@@ -60,8 +64,13 @@ pub struct Config {
 impl Config {
     pub fn load(path: &Path, xdg_dir: BaseDirectories) -> io::Result<Self> {
         let raw = fs::read_to_string(path)?;
-        let Some(rcfg) = RawConfig::parse(raw).verify() else {
-            unimplemented!()
+
+        let rcfg = match RawConfig::parse(raw).verify() {
+            Ok(x) => x,
+            Err(e) => {
+                error!("{}", e);
+                return Err(io::Error::from(io::ErrorKind::InvalidData));
+            }
         };
 
         let Some(api_key_path) = rcfg.api_key_path else {
@@ -103,6 +112,7 @@ pub struct OptArgs {
     pub path: bool,
     /// Sets background to random image in `storage_dir`.
     pub random: bool,
+    pub verbose: bool,
 }
 
 impl OptArgs {
@@ -113,6 +123,7 @@ impl OptArgs {
             config: pargs.opt_value_from_str(["-c", "--config"]).unwrap_or(None),
             path: pargs.contains(["-p", "--path"]),
             random: pargs.contains(["-z", "--random"]),
+            verbose: pargs.contains(["-v", "--verbose"]),
         }
     }
 }

@@ -1,30 +1,25 @@
 // SPDX-License-Identifier: GPL-2.0
 use anyhow::Result;
+use log::{error, warn};
 use sid_bg::XDG_NAME;
 use sid_bg::config::{Config, OptArgs};
 use sid_bg::response::Response;
 use std::ffi::OsStr;
+use std::fs::{self, DirEntry};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use std::{fs, io, str};
+use std::{io, str};
 use ureq::Agent;
 
-/// We need to do 3 things.
-/// 1. Download todays image, and let that image get set as the background.
-/// 2. Get the path of the currently selected image.
-/// 3. Method to randomize a set of images.
-
-fn is_dup(img: &OsStr, dir: &Path) -> bool {
-    fs::read_dir(dir)
-        .expect("Unable to read directory")
-        .filter_map(|x| x.ok())
-        .any(|s| s.file_name() == img)
+fn is_dup(dir: &[DirEntry], img: &OsStr) -> bool {
+    dir.iter().any(|s| s.file_name() == img)
 }
 
-fn newest_downloaded(dir: &Path) -> Option<PathBuf> {
-    fs::read_dir(dir)
-        .expect("Failed to read directory")
-        .filter_map(|x| x.ok())
+/// Returns the absolute path of the newest image in the provided directory.
+/// Returns None if the directory is empty
+fn newest_downloaded(dir: &[DirEntry]) -> Option<PathBuf> {
+    // Use max_by_key?
+    dir.iter()
         .map(|x| {
             let bytes = x.file_name().into_encoded_bytes();
             let path = x.path();
@@ -35,6 +30,7 @@ fn newest_downloaded(dir: &Path) -> Option<PathBuf> {
         .map(|(path, _)| path)
 }
 
+/// Before calling this function, we must check that todays entry is acually an image.
 fn download_image(dir: &Path, agent: Agent, res: Response) -> io::Result<PathBuf> {
     let mut img_bytes = res.get_image_bytes(&agent).unwrap();
     res.set_image_metadata(&mut img_bytes)?;
@@ -50,11 +46,17 @@ fn download_image(dir: &Path, agent: Agent, res: Response) -> io::Result<PathBuf
 fn get_newest_image(config: &Config, agent: Agent) -> Result<PathBuf> {
     let res = Response::make_request(&agent, &config.api_key)?;
 
-    if res.media_type != "image" || is_dup(&res.image_name(), &config.storage_dir) {
-        match newest_downloaded(&config.storage_dir) {
-            Some(cur_img) => return Ok(cur_img),
-            None => unimplemented!(),
-        }
+    // We would rather not download the image if possible
+    let directory: Vec<DirEntry> = fs::read_dir(&config.storage_dir)?
+        .filter_map(|x| x.ok())
+        .collect();
+    if res.media_type != "image" || is_dup(&directory, &res.image_name()) {
+        let Some(path) = newest_downloaded(&directory) else {
+            error!("Could not find image. Directory is empty and todays entry was not an image");
+            return Err(anyhow::Error::msg("REMOVE"));
+        };
+
+        return Ok(path);
     }
 
     let new_img = download_image(&config.storage_dir, agent, res)?;
@@ -74,6 +76,10 @@ fn set_bg_name(cache_file: &Path, bg_name: &Path) {
 
 fn main() -> Result<()> {
     let args = OptArgs::parse();
+    if args.verbose {
+        simple_logger::init_with_level(log::Level::Info).unwrap();
+    }
+
     let xdg_dir = xdg::BaseDirectories::with_prefix(XDG_NAME);
 
     // Firsts see if a path was provided then checks XDG for a path if none was found
@@ -82,10 +88,12 @@ fn main() -> Result<()> {
             .get_config_file("config")
             .unwrap_or_else(|| PathBuf::from("config"))
     });
+    log::info!("Config: {:?}", config_path);
 
-    let Ok(config) = Config::load(&config_path, xdg_dir) else {
-        panic!("Unable to read config! Please make sure it exsit and is in valid json.");
-    };
+    let config = Config::load(&config_path, xdg_dir).unwrap_or_else(|e| {
+        error!("Error reading config: {}", e);
+        panic!();
+    });
 
     let state_file = config.state_dir.join("bg");
 
