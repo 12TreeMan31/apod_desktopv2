@@ -4,7 +4,7 @@ After=multi-user.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/adi-bg
+ExecStart=/usr/bin/sid-bg
 
 [Install]
 WantedBy=default.target

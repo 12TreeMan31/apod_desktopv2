@@ -1,4 +1,4 @@
-# Astronomy Desktop Image Background (adi-bg)
+# Space Image Downloader (sid-bg)
 
 A basic program that fetches the current image from https://apod.nasa.gov.
 
@@ -12,19 +12,26 @@ Once installed you can then start `apod.service`
 
 ## Usage
 
+Sid-bg is meant to be used with other tools like `swaybg` or `awww` in order to set your background.
+
+Example of setting the background to todays image
+```bash
+BG=`sid-bg` && swaybg $BG
+```
+
 ### Arguments
 
-Currently there are only two different arguments:
+Currently there are only three different arguments:
 - `--config`: Specifies where the config file is located
-- `--save`: Creates a simlink in `favorite_dir` of the newest image downloaded
+- `--path`: Print the path of the current background image
+- `--random`: Sets a random downloaded image as the current background
 
 ### Config
 
-XDG is respected, and a example config file can be found in the repo named `config`.
-One thing to note when first running the program is that you must manually create the folders that you want to write to. 
+XDG is respected, and a example config file is provided. The parsing code can also be found in `src/config.rs` if you need more detail.
 
 ## API Usage
 
-If you plan on using this program I suggest creating your own [api key](https://api.nasa.gov/).
+I suggest creating your own [api key](https://api.nasa.gov/).
 
 When running this program, there will be at most 2 API calls preformed. The first one is getting todays image info, and the second one is fetching the image itself.

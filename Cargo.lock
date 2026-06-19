@@ -573,6 +573,7 @@ version = "0.1.2"
 dependencies = [
  "anyhow",
  "little_exif",
+ "log",
  "pico-args",
  "serde",
  "ureq",

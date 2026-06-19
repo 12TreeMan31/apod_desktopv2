@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0
-use adi_bg::config::{Config, OptArgs};
-use adi_bg::response::Response;
-use anyhow::{Result, bail};
+use anyhow::Result;
+use sid_bg::XDG_NAME;
+use sid_bg::config::{Config, OptArgs};
+use sid_bg::response::Response;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -73,7 +74,7 @@ fn set_bg_name(cache_file: &Path, bg_name: &Path) {
 
 fn main() -> Result<()> {
     let args = OptArgs::parse();
-    let xdg_dir = xdg::BaseDirectories::with_prefix("adi-bg");
+    let xdg_dir = xdg::BaseDirectories::with_prefix(XDG_NAME);
 
     // Firsts see if a path was provided then checks XDG for a path if none was found
     let config_path = args.config.unwrap_or_else(|| {
@@ -83,7 +84,7 @@ fn main() -> Result<()> {
     });
 
     let Ok(config) = Config::load(&config_path, xdg_dir) else {
-        bail!("Unable to read config! Please make sure it exsit and is in valid json.");
+        panic!("Unable to read config! Please make sure it exsit and is in valid json.");
     };
 
     let state_file = config.state_dir.join("bg");

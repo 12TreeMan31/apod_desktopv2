@@ -27,7 +27,7 @@ impl RawConfig {
 
         let pairs = cfg_string
             .lines()
-            .filter_map(|x| x.trim().split_once(":"))
+            .filter_map(|x| x.split_once(":"))
             .map(|(s, x)| (s.trim(), x.trim()));
 
         for (key, val) in pairs {
