@@ -1,7 +1,7 @@
 use log::{error, info, warn};
+use std::fs;
 /// Contains everything needed for configuration
 use std::path::{Path, PathBuf};
-use std::{fs, io};
 use xdg::BaseDirectories;
 
 #[derive(Debug)]
@@ -62,16 +62,11 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load(path: &Path, xdg_dir: BaseDirectories) -> io::Result<Self> {
-        let raw = fs::read_to_string(path)?;
+    pub fn load(path: &Path, xdg_dir: BaseDirectories) -> Result<Self, String> {
+        let raw =
+            fs::read_to_string(path).map_err(|e| format!("Could not read config file: {e}"))?;
 
-        let rcfg = match RawConfig::parse(raw).verify() {
-            Ok(x) => x,
-            Err(e) => {
-                error!("{}", e);
-                return Err(io::Error::from(io::ErrorKind::InvalidData));
-            }
-        };
+        let rcfg = RawConfig::parse(raw).verify()?;
 
         let Some(api_key_path) = rcfg.api_key_path else {
             unreachable!()
@@ -84,7 +79,7 @@ impl Config {
             Ok(x) => x.trim().to_string(),
             Err(e) => {
                 error!("Unable to get api key: {}", e);
-                return Err(e);
+                return Err("Unable to get api key".to_string());
             }
         };
 
@@ -95,10 +90,11 @@ impl Config {
         });
 
         if !storage_dir.exists() {
-            fs::create_dir_all(&storage_dir)?;
+            fs::create_dir_all(&storage_dir)
+                .map_err(|e| format!("Can't create storage_dir: {e}"))?;
         }
         if !state_dir.exists() {
-            fs::create_dir_all(&state_dir)?;
+            fs::create_dir_all(&state_dir).map_err(|e| format!("Can't create state_dir: {e}"))?;
         }
 
         let cfg = Config {

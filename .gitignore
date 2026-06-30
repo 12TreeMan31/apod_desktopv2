@@ -1,3 +1,5 @@
 /target
 /apod_images
 /KEY
+*.svg
+perf.*
