@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0
 use anyhow::Result;
-use log::{error, warn};
+use log::{error, info, warn};
 use sid_bg::XDG_NAME;
 use sid_bg::config::{Config, OptArgs};
-use sid_bg::response::Response;
+use sid_bg::response::{Query, Response};
 use std::ffi::OsStr;
 use std::fs::{self, DirEntry};
 use std::path::{Path, PathBuf};
+use std::str;
 use std::time::Duration;
-use std::{io, str};
 use ureq::Agent;
 
 fn is_dup(dir: &[DirEntry], img: &OsStr) -> bool {
@@ -30,27 +30,19 @@ fn newest_downloaded(dir: &[DirEntry]) -> Option<PathBuf> {
         .map(|(path, _)| path)
 }
 
-/// Before calling this function, we must check that todays entry is acually an image.
-fn download_image(dir: &Path, agent: Agent, res: Response) -> io::Result<PathBuf> {
-    let mut img_bytes = res.get_image_bytes(&agent).unwrap();
-    res.set_image_metadata(&mut img_bytes)?;
-
-    let mut path: PathBuf = dir.into();
-    path.push(res.image_name());
-
-    fs::write(&path, &img_bytes)?;
-
-    Ok(path)
-}
-
 fn get_newest_image(config: &Config, agent: Agent) -> Result<PathBuf> {
-    let res = Response::make_request(&agent, &config.api_key)?;
+    let query = Query::fetch_date(&config.api_key, None);
+    info!("{:?}", query);
+
+    let res = Response::make_request(agent.clone(), query)?
+        .pop()
+        .expect("Won't fail");
 
     // We would rather not download the image if possible
     let directory: Vec<DirEntry> = fs::read_dir(&config.storage_dir)?
         .filter_map(|x| x.ok())
         .collect();
-    if res.media_type != "image" || is_dup(&directory, &res.image_name()) {
+    if res.media_type() != "image" || is_dup(&directory, &res.image_name()) {
         let Some(path) = newest_downloaded(&directory) else {
             error!("Could not find image. Directory is empty and todays entry was not an image");
             return Err(anyhow::Error::msg("REMOVE"));
@@ -59,8 +51,8 @@ fn get_newest_image(config: &Config, agent: Agent) -> Result<PathBuf> {
         return Ok(path);
     }
 
-    let new_img = download_image(&config.storage_dir, agent, res)?;
-    Ok(new_img)
+    let path = res.download_image(agent, &config.storage_dir)?;
+    Ok(path)
 }
 
 fn get_bg_name(cache_file: &Path) -> Option<PathBuf> {
