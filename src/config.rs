@@ -107,6 +107,17 @@ impl Config {
     }
 }
 
+const HELP_TEXT: &str = r#"Usage: sid-bg [OPTIONS...]
+
+    -c --config         Path to the config file (defaults to $XDG_CONFIG/sid-bg/config)    
+    -p --path           Prints out the path to the current background image
+    -z --random         Selects a random image located in storage_dir
+    -v --verbose        Prints logs
+    -h --help           Prints this message
+
+If no commands are given, sid-bg will try and download the netwest image.
+"#;
+
 pub struct OptArgs {
     /// Specify a config file. Default: `$XDG_CONFIG_HOME/apod_desktop/config`
     pub config: Option<PathBuf>,
@@ -115,17 +126,27 @@ pub struct OptArgs {
     /// Sets background to random image in `storage_dir`.
     pub random: bool,
     pub verbose: bool,
+    pub help: bool,
 }
 
 impl OptArgs {
     /// Will not fail. It is on the user to not make typos.
     pub fn parse() -> Self {
         let mut pargs = pico_args::Arguments::from_env();
-        OptArgs {
+
+        let args = OptArgs {
             config: pargs.opt_value_from_str(["-c", "--config"]).unwrap_or(None),
             path: pargs.contains(["-p", "--path"]),
             random: pargs.contains(["-z", "--random"]),
             verbose: pargs.contains(["-v", "--verbose"]),
+            help: pargs.contains(["-h", "--help"]),
+        };
+
+        if args.help {
+            print!("{}", HELP_TEXT);
+            std::process::exit(0)
         }
+
+        args
     }
 }

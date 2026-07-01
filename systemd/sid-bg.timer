@@ -1,0 +1,9 @@
+[Unit]
+Decription=Run sid-bg daily at midnight or on boot
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Download newest apod image
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=sid-bg
+
+[Install]
+WantedBy=default.target
